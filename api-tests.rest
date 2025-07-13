@@ -1,0 +1,261 @@
+### Amper Tracker API Tests
+### Base URL: http://localhost:4000
+
+### 1. Health Check
+GET http://localhost:4000/api/health
+
+###
+
+### 2. POST Amper Data (ESP32 Simulation)
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 1.2
+}
+
+###
+
+### 3. POST Another Amper Data
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.8
+}
+
+###
+
+### 4. POST High Amper Data (>= 1.0A)
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 1.5
+}
+
+###
+
+### 5. POST Low Amper Data (< 1.0A)
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.6
+}
+
+###
+
+### 6. POST Data for Different User
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user2",
+  "amper": 2.1
+}
+
+###
+
+### 7. GET User Stats (Progress Bar Data)
+GET http://localhost:4000/api/user/user1/stats
+
+###
+
+### 8. GET User2 Stats
+GET http://localhost:4000/api/user/user2/stats
+
+###
+
+### 9. GET Recent Data (Last 24 Hours)
+GET http://localhost:4000/api/user/user1/recent
+
+###
+
+### 10. GET Recent Data for User2
+GET http://localhost:4000/api/user/user2/recent
+
+###
+
+### 11. GET All User Data (Development Only)
+GET http://localhost:4000/api/user/user1/all?limit=10&page=1
+
+###
+
+### 12. Test Invalid Username
+GET http://localhost:4000/api/user//stats
+
+###
+
+### 13. Test Invalid Amper Data
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": -1.0
+}
+
+###
+
+### 14. Test Missing Username
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "amper": 1.0
+}
+
+###
+
+### 15. Test Missing Amper Value
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1"
+}
+
+###
+
+### 16. Test Invalid Timestamp (No longer needed - timestamp not accepted)
+# POST http://localhost:4000/api/data
+# Content-Type: application/json
+# 
+# {
+#   "username": "user1",
+#   "amper": 1.0,
+#   "timestamp": "invalid-date"
+# }
+
+###
+
+### 17. Test Non-existent User Stats
+GET http://localhost:4000/api/user/nonexistentuser/stats
+
+###
+
+### 18. Test Non-existent User Recent
+GET http://localhost:4000/api/user/nonexistentuser/recent
+
+###
+
+### 19. Root Endpoint
+GET http://localhost:4000/
+
+###
+
+### 20. 404 Test
+GET http://localhost:4000/api/nonexistent
+
+###
+
+### Batch Test: Multiple Data Points for Realistic Testing
+### Run these in sequence to simulate real ESP32 data
+
+### Batch 1: Morning Data
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.3
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.5
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 1.2
+}
+
+###
+
+### Batch 2: Afternoon Data
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 2.1
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 1.8
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.9
+}
+
+###
+
+### Batch 3: Evening Data
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 1.4
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.7
+}
+
+###
+
+POST http://localhost:4000/api/data
+Content-Type: application/json
+
+{
+  "username": "user1",
+  "amper": 0.4
+}
+
+###
+
+### Final Stats Check
+GET http://localhost:4000/api/user/user1/stats
+
+###
+
+### Final Recent Data Check
+GET http://localhost:4000/api/user/user1/recent
+
+### 
