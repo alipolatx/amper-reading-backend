@@ -8,11 +8,21 @@ const router = express.Router();
 // POST /api/data - ESP32'den amper verisi al
 router.post('/data', validateAmperData, async (req, res) => {
   try {
-    const { username, amper } = req.body;
+    const { username, amper, productId } = req.body;
+
+    // Validate that product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid product ID - product not found'
+      });
+    }
 
     const newReading = new AmperReading({
       username,
-      amper
+      amper,
+      product: productId
     });
 
     await newReading.save();
@@ -24,6 +34,10 @@ router.post('/data', validateAmperData, async (req, res) => {
         id: newReading._id,
         username: newReading.username,
         amper: newReading.amper,
+        product: {
+          id: product._id,
+          name: product.name
+        },
         timestamp: newReading.createdAt
       }
     });
@@ -170,7 +184,7 @@ router.get('/products/:productId/users', async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findById(productId).populate('amperreadings');
+    const product = await Product.findById(productId);
     
     if (!product) {
       return res.status(404).json({
@@ -179,11 +193,17 @@ router.get('/products/:productId/users', async (req, res) => {
       });
     }
 
-    // Group amperreadings by username and get stats for each user
+    // Get all amper readings for this product using the new relationship
+    const readings = await AmperReading.find({ product: productId })
+      .select('username amper createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Group readings by username and get stats for each user
     const userGroups = {};
     
-    product.amperreadings.forEach(reading => {
-      const username = reading._doc.username;
+    readings.forEach(reading => {
+      const username = reading.username;
       if (!userGroups[username]) {
         userGroups[username] = {
           username: username,
@@ -205,10 +225,10 @@ router.get('/products/:productId/users', async (req, res) => {
 
     // Calculate averages
     Object.keys(userGroups).forEach(username => {
-      const readings = userGroups[username].readings;
-      const sum = readings.reduce((acc, reading) => acc + reading.amper, 0);
-      userGroups[username].averageAmper = readings.length > 0 ? 
-        Number((sum / readings.length).toFixed(2)) : 0;
+      const userReadings = userGroups[username].readings;
+      const sum = userReadings.reduce((acc, reading) => acc + reading.amper, 0);
+      userGroups[username].averageAmper = userReadings.length > 0 ? 
+        Number((sum / userReadings.length).toFixed(2)) : 0;
       
       // Remove readings array from response (we only need stats here)
       delete userGroups[username].readings;
@@ -287,9 +307,9 @@ router.get('/products/:productId/users/:username', async (req, res) => {
     // Parse timeRange if provided
     const startDate = parseTimeRange(timeRange);
     
-    // Build query filter
+    // Build query filter using the new relationship
     const baseFilter = {
-      _id: { $in: product.amperreadings },
+      product: productId,
       username: username
     };
     
@@ -298,11 +318,12 @@ router.get('/products/:productId/users/:username', async (req, res) => {
     //   baseFilter.createdAt = { $gte: startDate };
     // }
 
-    // Get amperreadings for this user that are also in this product
+    // Get amper readings for this user in this product
     const readings = await AmperReading.find(baseFilter)
-    .sort({ createdAt: -1 })
-    .limit(parseInt(limit))
-    .skip(skip);
+      .populate('product', 'name sensors')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
 
     const total = await AmperReading.countDocuments(baseFilter);
 

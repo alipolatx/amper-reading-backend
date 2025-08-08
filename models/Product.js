@@ -11,10 +11,6 @@ const productSchema = new mongoose.Schema({
   sensors: [{
     type: String,
     trim: true
-  }],
-  amperreadings: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'AmperReading'
   }]
 }, {
   timestamps: true
@@ -22,5 +18,16 @@ const productSchema = new mongoose.Schema({
 
 // Index for efficient queries
 productSchema.index({ name: 1 });
+
+// Virtual populate for amperreadings
+productSchema.virtual('amperreadings', {
+  ref: 'AmperReading',
+  localField: '_id',
+  foreignField: 'product'
+});
+
+// Ensure virtual fields are serialized
+productSchema.set('toJSON', { virtuals: true });
+productSchema.set('toObject', { virtuals: true });
 
 export default mongoose.model('Product', productSchema);

@@ -1,5 +1,5 @@
 const validateAmperData = (req, res, next) => {
-  const { username, amper } = req.body;
+  const { username, amper, productId } = req.body;
 
   // Check required fields
   if (!username) {
@@ -13,6 +13,13 @@ const validateAmperData = (req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Amper value is required'
+    });
+  }
+
+  if (!productId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Product ID is required'
     });
   }
 
@@ -54,9 +61,18 @@ const validateAmperData = (req, res, next) => {
     });
   }
 
+  // Validate productId format (MongoDB ObjectId)
+  if (typeof productId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(productId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Product ID must be a valid MongoDB ObjectId'
+    });
+  }
+
   // Clean and set validated data
   req.body.username = username.trim();
   req.body.amper = amperNum;
+  req.body.productId = productId.trim();
 
   next();
 };

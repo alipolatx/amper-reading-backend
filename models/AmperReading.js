@@ -13,13 +13,20 @@ const amperReadingSchema = new mongoose.Schema({
     required: [true, 'Amper value is required'],
     min: [0, 'Amper value cannot be negative'],
     max: [100, 'Amper value cannot exceed 100A']
+  },
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: [true, 'Product is required']
   }
 }, {
   timestamps: true
 });
 
-// Compound index for efficient queries
+// Compound indexes for efficient queries
 amperReadingSchema.index({ username: 1, createdAt: -1 });
+amperReadingSchema.index({ product: 1, createdAt: -1 });
+amperReadingSchema.index({ product: 1, username: 1, createdAt: -1 });
 
 // Virtual for checking if amper is high (>= 1.0A)
 amperReadingSchema.virtual('isHighAmper').get(function() {
