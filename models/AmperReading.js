@@ -18,6 +18,11 @@ const amperReadingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: [true, 'Product is required']
+  },
+  sensor: {
+    type: String,
+    required: false,
+    trim: true
   }
 }, {
   timestamps: true
@@ -27,6 +32,7 @@ const amperReadingSchema = new mongoose.Schema({
 amperReadingSchema.index({ username: 1, createdAt: -1 });
 amperReadingSchema.index({ product: 1, createdAt: -1 });
 amperReadingSchema.index({ product: 1, username: 1, createdAt: -1 });
+amperReadingSchema.index({ product: 1, username: 1, sensor: 1, createdAt: -1 });
 
 // Virtual for checking if amper is high (>= 1.0A)
 amperReadingSchema.virtual('isHighAmper').get(function() {

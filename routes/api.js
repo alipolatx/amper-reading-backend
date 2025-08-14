@@ -363,4 +363,226 @@ router.get('/products/:productId/users/:username', async (req, res) => {
   }
 });
 
+// GET /api/products/:productId/users/:username/readings - Get amperreadings for specific user in product with sensor filter
+router.get('/products/:productId/users/:username/readings', async (req, res) => {
+  try {
+    const { productId, username } = req.params;
+    const { limit = 50, page = 1, timeRange, sensor } = req.query;
+
+    const product = await Product.findById(productId);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // If sensor is provided, validate it exists in the product's sensors array
+    if (sensor && !product.sensors.includes(sensor)) {
+      return res.status(400).json({
+        success: false,
+        message: `Sensor '${sensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
+      });
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Parse timeRange if provided
+    const startDate = parseTimeRange(timeRange);
+    
+    // Build query filter using the new relationship
+    const baseFilter = {
+      product: productId,
+      username: username
+    };
+    
+    // Add sensor filter if provided
+    if (sensor) {
+      baseFilter.sensor = sensor;
+    }
+    
+    // Add time filter if timeRange is provided
+    if (startDate) {
+      baseFilter.createdAt = { $gte: startDate };
+    }
+
+    // Get amper readings for this user in this product (optionally filtered by sensor)
+    const readings = await AmperReading.find(baseFilter)
+      .populate('product', 'name sensors')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+
+    const total = await AmperReading.countDocuments(baseFilter);
+
+    res.json({
+      success: true,
+      data: {
+        product: {
+          id: product._id,
+          name: product.name,
+          sensors: product.sensors
+        },
+        username: username,
+        sensor: sensor || null,
+        readings: readings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      },
+      meta: {
+        productId: productId,
+        username: username,
+        sensor: sensor || null,
+        timeRange: timeRange || null,
+        filteredFrom: startDate ? startDate.toISOString() : null,
+        requestedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching user readings for product:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/products/:productId/sensor - Get users grouped by sensor for a product with pagination
+router.get('/products/:productId/sensor', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { sensor, limit = 50, page = 1, timeRange } = req.query;
+
+    if (!sensor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sensor parameter is required'
+      });
+    }
+
+    const product = await Product.findById(productId);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // Validate that the sensor exists in the product's sensors array
+    if (!product.sensors.includes(sensor)) {
+      return res.status(400).json({
+        success: false,
+        message: `Sensor '${sensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
+      });
+    }
+
+    // Parse timeRange if provided
+    const startDate = parseTimeRange(timeRange);
+    
+    // Build query filter
+    const baseFilter = {
+      product: productId,
+      sensor: sensor
+    };
+    
+    // Add time filter if timeRange is provided
+    if (startDate) {
+      baseFilter.createdAt = { $gte: startDate };
+    }
+
+    // Get all amper readings for this product and sensor
+    const readings = await AmperReading.find(baseFilter)
+      .select('username amper createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Group readings by username and get stats for each user
+    const userGroups = {};
+    
+    readings.forEach(reading => {
+      const username = reading.username;
+      if (!userGroups[username]) {
+        userGroups[username] = {
+          username: username,
+          totalReadings: 0,
+          latestReading: null,
+          averageAmper: 0,
+          readings: []
+        };
+      }
+      
+      userGroups[username].totalReadings++;
+      userGroups[username].readings.push(reading);
+      
+      if (!userGroups[username].latestReading || 
+          reading.createdAt > userGroups[username].latestReading.createdAt) {
+        userGroups[username].latestReading = reading;
+      }
+    });
+
+    // Calculate averages and prepare users array
+    const allUsers = Object.keys(userGroups).map(username => {
+      const userReadings = userGroups[username].readings;
+      const sum = userReadings.reduce((acc, reading) => acc + reading.amper, 0);
+      const averageAmper = userReadings.length > 0 ? 
+        Number((sum / userReadings.length).toFixed(2)) : 0;
+      
+      return {
+        username: username,
+        totalReadings: userGroups[username].totalReadings,
+        latestReading: userGroups[username].latestReading,
+        averageAmper: averageAmper
+      };
+    });
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    const paginatedUsers = allUsers.slice(skip, skip + parseInt(limit));
+    const total = allUsers.length;
+
+    res.json({
+      success: true,
+      data: {
+        product: {
+          id: product._id,
+          name: product.name,
+          sensors: product.sensors
+        },
+        sensor: sensor,
+        users: paginatedUsers,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      },
+      meta: {
+        productId: productId,
+        sensor: sensor,
+        timeRange: timeRange || null,
+        filteredFrom: startDate ? startDate.toISOString() : null,
+        totalUsers: total,
+        requestedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching users for product by sensor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 export default router; 
