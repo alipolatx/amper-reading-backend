@@ -5,9 +5,9 @@ const connectDB = async () => {
     const conn = await mongoose.connect(process.env.MONGODB_URI);
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-    
+
     // Handle connection events
-    mongoose.connection.on('error', (err) => {
+    mongoose.connection.on('error', err => {
       console.error('❌ MongoDB connection error:', err);
     });
 
@@ -25,11 +25,10 @@ const connectDB = async () => {
       console.log('📴 MongoDB connection closed through app termination');
       process.exit(0);
     });
-
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error.message);
     process.exit(1);
   }
 };
 
-export default connectDB; 
+export default connectDB;

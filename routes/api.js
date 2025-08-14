@@ -41,7 +41,6 @@ router.post('/data', validateAmperData, async (req, res) => {
         timestamp: newReading.createdAt
       }
     });
-
   } catch (error) {
     console.error('Error saving amper reading:', error);
     res.status(500).json({
@@ -63,7 +62,6 @@ router.get('/user/:username/stats', validateUsername, async (req, res) => {
       success: true,
       data: stats
     });
-
   } catch (error) {
     console.error('Error fetching user stats:', error);
     res.status(500).json({
@@ -78,7 +76,7 @@ router.get('/user/:username/stats', validateUsername, async (req, res) => {
 router.get('/user/:username/recent', validateUsername, async (req, res) => {
   try {
     const { username } = req.params;
-    
+
     console.log(`📱 Recent data request for user: ${username}`);
 
     const recentReadings = await AmperReading.getRecentReadings(username);
@@ -94,7 +92,6 @@ router.get('/user/:username/recent', validateUsername, async (req, res) => {
         timeRange: 'last_24_hours'
       }
     });
-
   } catch (error) {
     console.error('❌ Error fetching recent readings:', error);
     res.status(500).json({
@@ -115,14 +112,14 @@ router.get('/health', (req, res) => {
   });
 });
 
-// GET /api/user/:username/all 
+// GET /api/user/:username/all
 router.get('/user/:username/all', validateUsername, async (req, res) => {
   try {
     const { username } = req.params;
     const { limit = 50, page = 1 } = req.query;
 
     const skip = (page - 1) * limit;
-    
+
     const readings = await AmperReading.find({ username })
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
@@ -142,7 +139,6 @@ router.get('/user/:username/all', validateUsername, async (req, res) => {
         }
       }
     });
-
   } catch (error) {
     console.error('Error fetching all user readings:', error);
     res.status(500).json({
@@ -156,9 +152,7 @@ router.get('/user/:username/all', validateUsername, async (req, res) => {
 // GET /api/products - Get all products
 router.get('/products', async (req, res) => {
   try {
-    const products = await Product.find({})
-      .populate('amperreadings')
-      .sort({ createdAt: -1 });
+    const products = await Product.find({}).populate('amperreadings').sort({ createdAt: -1 });
 
     res.json({
       success: true,
@@ -168,7 +162,6 @@ router.get('/products', async (req, res) => {
         requestedAt: new Date().toISOString()
       }
     });
-
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({
@@ -185,7 +178,7 @@ router.get('/products/:productId/users', async (req, res) => {
     const { productId } = req.params;
 
     const product = await Product.findById(productId);
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -201,7 +194,7 @@ router.get('/products/:productId/users', async (req, res) => {
 
     // Group readings by username and get stats for each user
     const userGroups = {};
-    
+
     readings.forEach(reading => {
       const username = reading.username;
       if (!userGroups[username]) {
@@ -213,12 +206,14 @@ router.get('/products/:productId/users', async (req, res) => {
           readings: []
         };
       }
-      
+
       userGroups[username].totalReadings++;
       userGroups[username].readings.push(reading);
-      
-      if (!userGroups[username].latestReading || 
-          reading.createdAt > userGroups[username].latestReading.createdAt) {
+
+      if (
+        !userGroups[username].latestReading ||
+        reading.createdAt > userGroups[username].latestReading.createdAt
+      ) {
         userGroups[username].latestReading = reading;
       }
     });
@@ -227,9 +222,9 @@ router.get('/products/:productId/users', async (req, res) => {
     Object.keys(userGroups).forEach(username => {
       const userReadings = userGroups[username].readings;
       const sum = userReadings.reduce((acc, reading) => acc + reading.amper, 0);
-      userGroups[username].averageAmper = userReadings.length > 0 ? 
-        Number((sum / userReadings.length).toFixed(2)) : 0;
-      
+      userGroups[username].averageAmper =
+        userReadings.length > 0 ? Number((sum / userReadings.length).toFixed(2)) : 0;
+
       // Remove readings array from response (we only need stats here)
       delete userGroups[username].readings;
     });
@@ -252,7 +247,6 @@ router.get('/products/:productId/users', async (req, res) => {
         requestedAt: new Date().toISOString()
       }
     });
-
   } catch (error) {
     console.error('Error fetching product users:', error);
     res.status(500).json({
@@ -264,26 +258,26 @@ router.get('/products/:productId/users', async (req, res) => {
 });
 
 // Helper function to parse timeRange parameter
-const parseTimeRange = (timeRange) => {
+const parseTimeRange = timeRange => {
   if (!timeRange) return null;
-  
+
   const match = timeRange.match(/^(\d+)([hd])$/);
   if (!match) return null;
-  
+
   const value = parseInt(match[1]);
   const unit = match[2];
-  
+
   // Validate allowed values
   const allowedHours = [1, 6, 12, 24];
   const allowedDays = [7, 30];
-  
+
   if (unit === 'h' && !allowedHours.includes(value)) return null;
   if (unit === 'd' && !allowedDays.includes(value)) return null;
-  
+
   const now = new Date();
   const hoursToSubtract = unit === 'h' ? value : value * 24;
-  const startDate = new Date(now.getTime() - (hoursToSubtract * 60 * 60 * 1000));
-  
+  const startDate = new Date(now.getTime() - hoursToSubtract * 60 * 60 * 1000);
+
   return startDate;
 };
 
@@ -294,7 +288,7 @@ router.get('/products/:productId/users/:username', async (req, res) => {
     const { limit = 50, page = 1, timeRange } = req.query;
 
     const product = await Product.findById(productId);
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -306,13 +300,13 @@ router.get('/products/:productId/users/:username', async (req, res) => {
 
     // Parse timeRange if provided
     const startDate = parseTimeRange(timeRange);
-    
+
     // Build query filter using the new relationship
     const baseFilter = {
       product: productId,
       username: username
     };
-    
+
     // Add time filter if timeRange is provided // TODO: Uncomment this
     // if (startDate) {
     //   baseFilter.createdAt = { $gte: startDate };
@@ -352,7 +346,6 @@ router.get('/products/:productId/users/:username', async (req, res) => {
         requestedAt: new Date().toISOString()
       }
     });
-
   } catch (error) {
     console.error('Error fetching user readings for product:', error);
     res.status(500).json({
@@ -369,8 +362,11 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
     const { productId, username } = req.params;
     const { limit = 50, page = 1, timeRange, sensor } = req.query;
 
+    // Decode URL-encoded sensor parameter (convert + to spaces)
+    const decodedSensor = sensor ? decodeURIComponent(sensor.replace(/\+/g, ' ')) : sensor;
+
     const product = await Product.findById(productId);
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -379,10 +375,10 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
     }
 
     // If sensor is provided, validate it exists in the product's sensors array
-    if (sensor && !product.sensors.includes(sensor)) {
+    if (decodedSensor && !product.sensors.includes(decodedSensor)) {
       return res.status(400).json({
         success: false,
-        message: `Sensor '${sensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
+        message: `Sensor '${decodedSensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
       });
     }
 
@@ -390,22 +386,22 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
 
     // Parse timeRange if provided
     const startDate = parseTimeRange(timeRange);
-    
+
     // Build query filter using the new relationship
     const baseFilter = {
       product: productId,
       username: username
     };
-    
+
     // Add sensor filter if provided
-    if (sensor) {
-      baseFilter.sensor = sensor;
+    if (decodedSensor) {
+      baseFilter.sensor = decodedSensor;
     }
-    
+
     // Add time filter if timeRange is provided
-    if (startDate) {
-      baseFilter.createdAt = { $gte: startDate };
-    }
+    // if (startDate) {
+    //   baseFilter.createdAt = { $gte: startDate };
+    // }
 
     // Get amper readings for this user in this product (optionally filtered by sensor)
     const readings = await AmperReading.find(baseFilter)
@@ -425,7 +421,7 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
           sensors: product.sensors
         },
         username: username,
-        sensor: sensor || null,
+        sensor: decodedSensor || null,
         readings: readings,
         pagination: {
           page: parseInt(page),
@@ -437,13 +433,12 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
       meta: {
         productId: productId,
         username: username,
-        sensor: sensor || null,
+        sensor: decodedSensor || null,
         timeRange: timeRange || null,
         filteredFrom: startDate ? startDate.toISOString() : null,
         requestedAt: new Date().toISOString()
       }
     });
-
   } catch (error) {
     console.error('Error fetching user readings for product:', error);
     res.status(500).json({
@@ -460,7 +455,10 @@ router.get('/products/:productId/sensor', async (req, res) => {
     const { productId } = req.params;
     const { sensor, limit = 50, page = 1, timeRange } = req.query;
 
-    if (!sensor) {
+    // Decode URL-encoded sensor parameter (convert + to spaces)
+    const decodedSensor = sensor ? decodeURIComponent(sensor.replace(/\+/g, ' ')) : sensor;
+
+    if (!decodedSensor) {
       return res.status(400).json({
         success: false,
         message: 'Sensor parameter is required'
@@ -468,7 +466,7 @@ router.get('/products/:productId/sensor', async (req, res) => {
     }
 
     const product = await Product.findById(productId);
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -477,26 +475,26 @@ router.get('/products/:productId/sensor', async (req, res) => {
     }
 
     // Validate that the sensor exists in the product's sensors array
-    if (!product.sensors.includes(sensor)) {
+    if (!product.sensors.includes(decodedSensor)) {
       return res.status(400).json({
         success: false,
-        message: `Sensor '${sensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
+        message: `Sensor '${decodedSensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
       });
     }
 
     // Parse timeRange if provided
     const startDate = parseTimeRange(timeRange);
-    
+
     // Build query filter
     const baseFilter = {
       product: productId,
-      sensor: sensor
+      sensor: decodedSensor
     };
-    
+
     // Add time filter if timeRange is provided
-    if (startDate) {
-      baseFilter.createdAt = { $gte: startDate };
-    }
+    // if (startDate) {
+    //   baseFilter.createdAt = { $gte: startDate };
+    // }
 
     // Get all amper readings for this product and sensor
     const readings = await AmperReading.find(baseFilter)
@@ -506,7 +504,7 @@ router.get('/products/:productId/sensor', async (req, res) => {
 
     // Group readings by username and get stats for each user
     const userGroups = {};
-    
+
     readings.forEach(reading => {
       const username = reading.username;
       if (!userGroups[username]) {
@@ -518,12 +516,14 @@ router.get('/products/:productId/sensor', async (req, res) => {
           readings: []
         };
       }
-      
+
       userGroups[username].totalReadings++;
       userGroups[username].readings.push(reading);
-      
-      if (!userGroups[username].latestReading || 
-          reading.createdAt > userGroups[username].latestReading.createdAt) {
+
+      if (
+        !userGroups[username].latestReading ||
+        reading.createdAt > userGroups[username].latestReading.createdAt
+      ) {
         userGroups[username].latestReading = reading;
       }
     });
@@ -532,9 +532,9 @@ router.get('/products/:productId/sensor', async (req, res) => {
     const allUsers = Object.keys(userGroups).map(username => {
       const userReadings = userGroups[username].readings;
       const sum = userReadings.reduce((acc, reading) => acc + reading.amper, 0);
-      const averageAmper = userReadings.length > 0 ? 
-        Number((sum / userReadings.length).toFixed(2)) : 0;
-      
+      const averageAmper =
+        userReadings.length > 0 ? Number((sum / userReadings.length).toFixed(2)) : 0;
+
       return {
         username: username,
         totalReadings: userGroups[username].totalReadings,
@@ -556,7 +556,7 @@ router.get('/products/:productId/sensor', async (req, res) => {
           name: product.name,
           sensors: product.sensors
         },
-        sensor: sensor,
+        sensor: decodedSensor,
         users: paginatedUsers,
         pagination: {
           page: parseInt(page),
@@ -567,14 +567,13 @@ router.get('/products/:productId/sensor', async (req, res) => {
       },
       meta: {
         productId: productId,
-        sensor: sensor,
+        sensor: decodedSensor,
         timeRange: timeRange || null,
         filteredFrom: startDate ? startDate.toISOString() : null,
         totalUsers: total,
         requestedAt: new Date().toISOString()
       }
     });
-
   } catch (error) {
     console.error('Error fetching users for product by sensor:', error);
     res.status(500).json({
@@ -585,4 +584,4 @@ router.get('/products/:productId/sensor', async (req, res) => {
   }
 });
 
-export default router; 
+export default router;

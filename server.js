@@ -19,11 +19,13 @@ connectDB();
 app.use(helmet());
 
 // CORS configuration for React Native
-app.use(cors({
-  origin: '*', // In production, specify your mobile app's domain
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: '*', // In production, specify your mobile app's domain
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  })
+);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -34,7 +36,7 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again later.'
   },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
 app.use('/api/', limiter);
@@ -76,9 +78,9 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   console.error('Global error handler:', error);
-  
+
   res.status(error.status || 500).json({
     success: false,
     message: error.message || 'Internal server error',
@@ -102,4 +104,4 @@ process.on('SIGTERM', () => {
   });
 });
 
-export default app; 
+export default app;

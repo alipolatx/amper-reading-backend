@@ -98,4 +98,4 @@ const validateUsername = (req, res, next) => {
   next();
 };
 
-export { validateAmperData, validateUsername }; 
+export { validateAmperData, validateUsername };

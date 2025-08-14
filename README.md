@@ -21,17 +21,20 @@ ESP32'den gelen amper tüketim verilerini toplayan ve mobil uygulamaya sunan RES
 ## 🛠️ Kurulum
 
 ### 1. Projeyi Klonla
+
 ```bash
 git clone <repository-url>
 cd amper-tracker-api
 ```
 
 ### 2. Bağımlılıkları Yükle
+
 ```bash
 npm install
 ```
 
 ### 3. Environment Variables
+
 `.env` dosyasını oluştur ve `env.example`'daki değerleri kopyala:
 
 ```bash
@@ -39,6 +42,7 @@ cp env.example .env
 ```
 
 `.env` dosyasını düzenle:
+
 ```env
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
 PORT=3000
@@ -57,6 +61,7 @@ RATE_LIMIT_MAX_REQUESTS=100
 6. Connection string'i `.env` dosyasına ekle
 
 ### 5. Uygulamayı Başlat
+
 ```bash
 # Development
 npm run dev
@@ -70,9 +75,11 @@ npm start
 ### ESP32 için
 
 #### POST /api/data
+
 Amper verisi gönder
 
 **Request Body:**
+
 ```json
 {
   "username": "user1",
@@ -82,6 +89,7 @@ Amper verisi gönder
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -98,9 +106,11 @@ Amper verisi gönder
 ### Mobil Uygulama için
 
 #### GET /api/user/:username/stats
+
 Kullanıcı istatistikleri (progress bar için)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -114,9 +124,11 @@ Kullanıcı istatistikleri (progress bar için)
 ```
 
 #### GET /api/user/:username/recent
+
 Son 24 saat verisi (tablo için)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -136,9 +148,11 @@ Son 24 saat verisi (tablo için)
 ### Utility Endpoints
 
 #### GET /api/health
+
 API sağlık kontrolü
 
 #### GET /api/user/:username/all (Development)
+
 Tüm kullanıcı verileri (sadece development modunda)
 
 ## 🔧 ESP32 Örnek Kodu
@@ -155,7 +169,7 @@ const char* apiUrl = "https://your-api-url.com/api/data";
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
-  
+
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Connecting to WiFi...");
@@ -166,32 +180,32 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     // Amper değerini oku (örnek)
     float amperValue = readAmperSensor();
-    
+
     // JSON oluştur
     StaticJsonDocument<200> doc;
     doc["username"] = "user1";
     doc["amper"] = amperValue;
     doc["timestamp"] = getCurrentTimestamp();
-    
+
     String jsonString;
     serializeJson(doc, jsonString);
-    
+
     // HTTP POST gönder
     HTTPClient http;
     http.begin(apiUrl);
     http.addHeader("Content-Type", "application/json");
-    
+
     int httpResponseCode = http.POST(jsonString);
-    
+
     if (httpResponseCode > 0) {
       Serial.println("Data sent successfully");
     } else {
       Serial.println("Error sending data");
     }
-    
+
     http.end();
   }
-  
+
   delay(60000); // 1 dakika bekle
 }
 
@@ -231,6 +245,7 @@ String getCurrentTimestamp() {
 ```
 
 **Index:**
+
 ```javascript
 { "username": 1, "timestamp": -1 }
 ```
@@ -280,4 +295,4 @@ MIT License
 2. Feature branch oluştur
 3. Commit et
 4. Push et
-5. Pull Request oluştur 
+5. Pull Request oluştur
