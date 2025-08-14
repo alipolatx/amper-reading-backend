@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import AmperReading from '../models/AmperReading.js';
 import Product from '../models/Product.js';
 import { validateAmperData, validateUsername } from '../middleware/validation.js';
@@ -314,7 +315,7 @@ router.get('/products/:productId/users/:username', async (req, res) => {
 
     // Get amper readings for this user in this product
     const readings = await AmperReading.find(baseFilter)
-      .populate('product', 'name sensors')
+      .select('username amper sensor createdAt updatedAt')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
@@ -405,7 +406,7 @@ router.get('/products/:productId/users/:username/readings', async (req, res) => 
 
     // Get amper readings for this user in this product (optionally filtered by sensor)
     const readings = await AmperReading.find(baseFilter)
-      .populate('product', 'name sensors')
+      .select('username amper sensor createdAt updatedAt')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
@@ -576,6 +577,178 @@ router.get('/products/:productId/sensor', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching users for product by sensor:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/products/:productId/users/:username/readings/stats - Get statistics for filtered amper readings
+router.get('/products/:productId/users/:username/readings/stats', async (req, res) => {
+  try {
+    const { productId, username } = req.params;
+    const { timeRange, sensor } = req.query;
+
+    // Decode URL-encoded sensor parameter (convert + to spaces)
+    const decodedSensor = sensor ? decodeURIComponent(sensor.replace(/\+/g, ' ')) : sensor;
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+
+    // If sensor is provided, validate it exists in the product's sensors array
+    if (decodedSensor && !product.sensors.includes(decodedSensor)) {
+      return res.status(400).json({
+        success: false,
+        message: `Sensor '${decodedSensor}' not found in product. Available sensors: ${product.sensors.join(', ')}`
+      });
+    }
+
+    // Parse timeRange if provided
+    const startDate = parseTimeRange(timeRange);
+
+    // Build query filter using the new relationship
+    const baseFilter = {
+      product: productId,
+      username: username
+    };
+
+    // Add sensor filter if provided
+    if (decodedSensor) {
+      baseFilter.sensor = decodedSensor;
+    }
+
+    // Add time filter if timeRange is provided
+    // if (startDate) {
+    //   baseFilter.createdAt = { $gte: startDate };
+    // }
+
+    console.log('🔍 Statistics baseFilter:', JSON.stringify(baseFilter, null, 2));
+    
+    // Convert productId to ObjectId for aggregation
+    const aggregationFilter = {
+      ...baseFilter,
+      product: new mongoose.Types.ObjectId(productId)
+    };
+    console.log('🔍 Aggregation filter:', JSON.stringify(aggregationFilter, null, 2));
+    
+    // Debug: Test if any documents exist with this filter using find()
+    const testCount = await AmperReading.countDocuments(baseFilter);
+    console.log('📊 Test count with find():', testCount);
+
+    // Get aggregated statistics for all filtered data
+    const stats = await AmperReading.aggregate([
+      { $match: aggregationFilter },
+      {
+        $group: {
+          _id: null,
+          totalReadings: { $sum: 1 },
+          minAmper: { $min: '$amper' },
+          maxAmper: { $max: '$amper' },
+          avgAmper: { $avg: '$amper' },
+          offCount: {
+            $sum: {
+              $cond: [{ $eq: ['$amper', 0] }, 1, 0]
+            }
+          },
+          lowCount: {
+            $sum: {
+              $cond: [{ $and: [{ $gt: ['$amper', 0] }, { $lt: ['$amper', 0.5] }] }, 1, 0]
+            }
+          },
+          midCount: {
+            $sum: {
+              $cond: [{ $and: [{ $gte: ['$amper', 0.5] }, { $lt: ['$amper', 1.0] }] }, 1, 0]
+            }
+          },
+          highCount: {
+            $sum: {
+              $cond: [{ $gte: ['$amper', 1.0] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Handle case when no data is found
+    if (stats.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          product: {
+            id: product._id,
+            name: product.name,
+            sensors: product.sensors
+          },
+          username: username,
+          sensor: decodedSensor || null,
+          statistics: {
+            totalReadings: 0,
+            minAmper: 0,
+            maxAmper: 0,
+            avgAmper: 0,
+            categories: {
+              off: 0,
+              low: 0,
+              mid: 0,
+              high: 0
+            }
+          }
+        },
+        meta: {
+          productId: productId,
+          username: username,
+          sensor: decodedSensor || null,
+          timeRange: timeRange || null,
+          filteredFrom: startDate ? startDate.toISOString() : null,
+          requestedAt: new Date().toISOString()
+        }
+      });
+    }
+
+    const stat = stats[0];
+
+    res.json({
+      success: true,
+      data: {
+        product: {
+          id: product._id,
+          name: product.name,
+          sensors: product.sensors
+        },
+        username: username,
+        sensor: decodedSensor || null,
+        statistics: {
+          totalReadings: stat.totalReadings,
+          minAmper: Number(stat.minAmper.toFixed(2)),
+          maxAmper: Number(stat.maxAmper.toFixed(2)),
+          avgAmper: Number(stat.avgAmper.toFixed(2)),
+          categories: {
+            off: stat.offCount,
+            low: stat.lowCount,
+            mid: stat.midCount,
+            high: stat.highCount
+          }
+        }
+      },
+      meta: {
+        productId: productId,
+        username: username,
+        sensor: decodedSensor || null,
+        timeRange: timeRange || null,
+        filteredFrom: startDate ? startDate.toISOString() : null,
+        requestedAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching amper reading statistics:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
