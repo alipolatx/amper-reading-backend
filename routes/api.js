@@ -39,7 +39,7 @@ router.post('/data', validateAmperData, async (req, res) => {
         product: {
           id: product._id,
           name: product.name,
-          sensors: product.sensor
+          sensors: product.sensors
         },
         timestamp: newReading.createdAt
       }
