@@ -9,7 +9,7 @@ const router = express.Router();
 // POST /api/data - ESP32'den amper verisi al
 router.post('/data', validateAmperData, async (req, res) => {
   try {
-    const { username, amper, productId } = req.body;
+    const { username, amper, productId,sensor } = req.body;
 
     // Validate that product exists
     const product = await Product.findById(productId);
@@ -23,7 +23,8 @@ router.post('/data', validateAmperData, async (req, res) => {
     const newReading = new AmperReading({
       username,
       amper,
-      product: productId
+      product: productId,
+      sensor
     });
 
     await newReading.save();
@@ -37,7 +38,8 @@ router.post('/data', validateAmperData, async (req, res) => {
         amper: newReading.amper,
         product: {
           id: product._id,
-          name: product.name
+          name: product.name,
+          sensors: product.sensor
         },
         timestamp: newReading.createdAt
       }
